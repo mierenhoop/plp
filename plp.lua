@@ -3,7 +3,34 @@ local plp = {}
 local sub = string.sub
 local ins = table.insert
 
-function plp.compile(s)
+plp.loaded = {}
+
+function plp.execute(name, t)
+    local f = plp.loaded[name]
+    if f then
+        return f(t)
+    end
+    return "Not found"
+end
+
+local function basename(filename)
+    return filename:match"([^/%.]+)%.?[^%.]*$"
+end
+
+function plp.compilefiles(filenames)
+    for _, filename in ipairs(filenames) do
+        local file, err = io.open(filename, "r")
+        if err then return nil, err end
+        local func, err = plp.compilestring((file:read"*a"))
+        if err then return nil, err end
+        plp.loaded[filename] = func
+        plp.loaded[basename(filename)] = func
+    end
+end
+
+local parse_error = "Parse error"
+
+function plp.compilestring(s)
     -- allow user to have other echo function
     plp.echo = plp.echo or io.write
 
@@ -26,7 +53,7 @@ function plp.compile(s)
         -- If lua5.1 or luajit `_ENV` doesn't exist
         ins(pieces, [[
         local plp = require"plp"
-        local echo = plp.echo
+        local echo, execute = plp.echo, plp.execute
         ]])
     end
     ins(pieces, "echo[[")
@@ -49,7 +76,7 @@ function plp.compile(s)
             consume()
             last=i
         elseif peek(2) == "<?" then
-            assert(state == "html")
+            if state ~= "html" then return nil, parse_error end
             -- strip newline if it precedes
             -- TODO: skip all spaces/tabs before too?
             ins(pieces, sub(s, last, i-(sub(s,i-1,i-1) == "\n" and 2 or 1)))
@@ -62,11 +89,12 @@ function plp.compile(s)
             elseif peek(3) == "lua" then
                 state="block"
                 consume(3)
-            else error()
+            else
+                return nil, parse_error
             end
             last=i
         elseif peek(2) == "?>" then
-            assert(state ~= "html")
+            if state == "html" then return nil, parse_error end
             ins(pieces, sub(s, last, i-1))
             if state == "inline" then
                 ins(pieces, "))")
@@ -88,9 +116,9 @@ function plp.compile(s)
     if _VERSION == "Lua 5.1" then
         f, err = loadstring(table.concat(pieces))
     else
-        f, err = load(table.concat(pieces), nil, nil, setmetatable({plp = plp, echo=plp.echo},{__index=_G}))
+        f, err = load(table.concat(pieces), nil, nil, setmetatable({plp = plp, echo=plp.echo, execute=plp.execute},{__index=_G}))
     end
-    if err then error(err) end
+    if err then return nil, err end
     return f
 end
 

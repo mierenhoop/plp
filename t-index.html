@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>
+Hello from <?= _VERSION ?>
+</title>
+</head>
+<body>
+<?lua if $list then ?>
+<ul>
+<?lua for _, v in ipairs($list) do ?>
+<li>Value <?= v ?></li>
+<?lua end ?>
+</ul>
+<?lua end ?>
+</body>
+</html>

@@ -1,9 +1,8 @@
 local plp = require"plp"
 
-local outstream = {}
-plp.echo = function(s) table.insert(outstream, s) end
+plp.echo = io.write
 
-local f = plp.compile[[
+local f, err = plp.compilestring[[
 <!DOCTYPE html>
 <html>
 <head>
@@ -23,6 +22,15 @@ Hello from <?= _VERSION ?>
 </html>
 ]]
 
+print"Test compilestring"
+assert(not err)
 f{list={1,2,3}}
+print""
 
-print(table.concat(outstream))
+plp.compilefiles{"t-index.html"}
+
+print"Test execute"
+assert(not plp.execute("t-index.html",{list={}}))
+print""
+print"Test execute by basename"
+assert(not plp.execute("t-index",{list={}}))
